@@ -821,7 +821,7 @@ function showDashboardView() {
 
 function startPolling() {
   stopPolling();
-  pollTimer = // Firebase 실시간 구독으로 대체
+  // Firebase 실시간 구독으로 대체
 }
 
 function stopPolling() {
@@ -1046,7 +1046,7 @@ function saveSelectedQR() {
 async function saveAllAsPDF() {
   showToast('PDF 생성 중... 잠시만 기다려 주세요 📄');
   closeQRModal();
-  await new Promise(r => setTimeout(r, 300));
+  /* 딜레이 */
 
   const { jsPDF } = window.jspdf;
   const pageW = 210, pageH = 297;
@@ -1093,7 +1093,7 @@ async function saveAllAsPDF() {
       colorDark: '#2D3748', colorLight: '#FFFFFF',
       correctLevel: QRCode.CorrectLevel.H
     });
-    await new Promise(r => setTimeout(r, 300));
+    /* 딜레이 */
     const qrCanvas = tmpDiv.querySelector('canvas');
     const qrImg = tmpDiv.querySelector('img');
     let qrSrc = '';
