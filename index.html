@@ -277,16 +277,12 @@ body {
   cursor: pointer;
 }
 .work-checkbox svg { display: none; width: 12px; height: 12px; }
+.work-checkbox.checked svg { display: block !important; }
 .work-card.selected .work-checkbox {
   background: #48BB78;
   border-color: #48BB78;
 }
-.work-card.selected .work-checkbox svg { display: block; }
-.work-thumb {
-  width: 100%; aspect-ratio: 4/3;
-  object-fit: cover;
-  display: block;
-}
+.work-card.selected .work-checkbox svg { display: block !important; }
 .work-thumb-placeholder {
   width: 100%; aspect-ratio: 4/3;
   background: linear-gradient(135deg, #C8F5A0 0%, #AEE4FF 100%);
@@ -931,19 +927,27 @@ function renderWorks() {
     cb.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9.5 10,2.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     // 초기 체크 상태 반영
     const isChecked = selectedWorks.has(String(w.id));
-    cb.querySelector('svg').style.display = isChecked ? 'block' : 'none';
-    cb.style.background   = isChecked ? '#48BB78' : 'white';
-    cb.style.borderColor  = isChecked ? '#48BB78' : '#CBD5E0';
+    if (isChecked) {
+      cb.classList.add('checked');
+      cb.style.background  = '#48BB78';
+      cb.style.borderColor = '#48BB78';
+    }
     card.classList.toggle('selected', isChecked);
     cb.addEventListener('click', function(e) {
       e.stopPropagation();
       const wid = String(w.id);
-      if (selectedWorks.has(wid)) selectedWorks.delete(wid);
-      else selectedWorks.add(wid);
+      if (selectedWorks.has(wid)) {
+        selectedWorks.delete(wid);
+        cb.classList.remove('checked');
+        cb.style.background  = 'white';
+        cb.style.borderColor = '#CBD5E0';
+      } else {
+        selectedWorks.add(wid);
+        cb.classList.add('checked');
+        cb.style.background  = '#48BB78';
+        cb.style.borderColor = '#48BB78';
+      }
       card.classList.toggle('selected', selectedWorks.has(wid));
-      cb.querySelector('svg').style.display = selectedWorks.has(wid) ? 'block' : 'none';
-      cb.style.background = selectedWorks.has(wid) ? '#48BB78' : 'white';
-      cb.style.borderColor = selectedWorks.has(wid) ? '#48BB78' : '#CBD5E0';
       updateSelectedUI();
     });
     topBar.appendChild(cb);
@@ -1303,10 +1307,12 @@ function renderTrash() {
 }
 
 function restoreWork(id) {
-  const idx = trashWorks.findIndex(w => w.id === id);
+  const idx = trashWorks.findIndex(w => String(w.id) === String(id));
   if (idx < 0) return;
   const restored = trashWorks.splice(idx, 1)[0];
   delete restored.deletedAt;
+  works.unshift(restored);
+  saveWorks(); saveTrash();
   // Firebase에 복구
   if (restored.docId) {
     getDB().collection('gardens').doc(restored.docId).set({
@@ -1318,10 +1324,11 @@ function restoreWork(id) {
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     }).catch(function(){});
   }
-  works.unshift(restored);
-  saveWorks(); saveTrash();
   renderTrash();
+  renderWorks();
   showToast('작품이 복구되었어요! ✨');
+  // 휴지통 목록이 비었으면 작품 목록으로 이동
+  if (trashWorks.length === 0) showDashboard();
 }
 
 function permDelete(id) {
