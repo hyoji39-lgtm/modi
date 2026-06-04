@@ -103,7 +103,6 @@ body {
   border-radius: 10px; line-height: 1.6;
 }
 
-
 /* ===== 대시보드 ===== */
 .dashboard { display: none; min-height: 100vh; background: #F7F9FC; position: relative; }
 .dashboard.active { display: block; }
@@ -479,24 +478,21 @@ body {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
 </style>
-
 <!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
-  const firebaseConfig = {
+  firebase.initializeApp({
     apiKey: "AIzaSyCYCsrByMA-89BncHFCpAlQ9hjvSh5DF8Y",
     authDomain: "my-little-garden-6207e.firebaseapp.com",
     projectId: "my-little-garden-6207e",
     storageBucket: "my-little-garden-6207e.firebasestorage.app",
     messagingSenderId: "749338971935",
     appId: "1:749338971935:web:f6985a2cd38c30e6a3ea2a"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const __db = firebase.firestore();
+  });
+  var __db = firebase.firestore();
   console.log('Firebase (교사 compat) OK');
 </script>
-
 </head>
 <body>
 
@@ -518,10 +514,10 @@ body {
     </div>
     <div class="input-group">
       <label class="input-label" for="input-pw">비밀번호 (숫자 4자리)</label>
-      <input class="input-field" type="password" id="input-pw" placeholder="••••" maxlength="4" onkeydown="if(event.key==='Enter') window.doLogin && window.doLogin()">
+      <input class="input-field" type="password" id="input-pw" placeholder="••••" maxlength="4">
     </div>
-    <div class="login-error" id="login-error"></div>
-    <button class="login-btn" id="login-btn" onclick="doLogin()">로그인 🌸</button>
+    <div class="login-error" id="login-error">아이디 또는 비밀번호를 다시 확인해 주세요.</div>
+    <button class="login-btn" onclick="doLogin()">로그인하기 🌸</button>
     <div class="login-hint">
       💡 처음 로그인하면 자동으로 계정이 만들어져요.
     </div>
@@ -700,5 +696,534 @@ function startFirebaseListener() {
     console.warn('Firebase 구독 오류:', err);
   });
 }
+function saveWorks() {
+  localStorage.setItem(worksKey(), JSON.stringify(works));
+}
+function saveTrash() {
+  localStorage.setItem(trashKey(), JSON.stringify(trashWorks));
+}
 
+// 선생님 ID + 수업 코드를 포함한 학생용 URL 생성
+function getGardenURL() {
+  const base = location.href.replace('teacher_garden_v1.html', 'index.html');
+  const classCode = currentTeacher.classCode || '';
+  return base + '?teacher=' + currentTeacher.id + '&class=' + classCode;
+}
 
+// ===== 로그인 =====
+async function doLogin() {
+  let name    = document.getElementById('input-name').value.trim();
+  const id    = document.getElementById('input-id').value.trim();
+  const pw    = document.getElementById('input-pw').value.trim();
+  const errEl = document.getElementById('login-error');
+  const btn   = document.querySelector('.login-btn');
+
+  errEl.style.display = 'none';
+
+  if (!name || !id || !pw) {
+    errEl.textContent = '이름, 아이디, 비밀번호를 모두 입력해 주세요.';
+    errEl.style.display = 'block'; return;
+  }
+  if (!/^[a-zA-Z]{4}\d{3}$/.test(id)) {
+    errEl.textContent = 'ID는 영문 4자리+숫자 3자리로 입력해 주세요. (예: abcd123)';
+    errEl.style.display = 'block'; return;
+  }
+  if (!/^\d{4}$/.test(pw)) {
+    errEl.textContent = '비밀번호는 숫자 4자리로 입력해 주세요. (예: 1234)';
+    errEl.style.display = 'block'; return;
+  }
+
+  btn.textContent = '확인 중...';
+  btn.disabled = true;
+
+  try {
+    const snap = await __db.collection('teachers').where('id', '==', id).get();
+
+    if (snap.empty) {
+      // 처음 로그인 → 계정 자동 생성
+      await __db.collection('teachers').add({
+        name: name, id: id, pw: pw,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      // 기존 계정 → 비번 확인
+      const account = snap.docs[0].data();
+      if (account.pw !== pw) {
+        errEl.textContent = '비밀번호가 맞지 않아요. 다시 확인해 주세요.';
+        errEl.style.display = 'block';
+        btn.textContent = '로그인하기 🌸';
+        btn.disabled = false;
+        return;
+      }
+      name = account.name;
+    }
+
+    const savedCode = localStorage.getItem('garden_classcode_' + id) || generateCode();
+    localStorage.setItem('garden_classcode_' + id, savedCode);
+
+    currentTeacher = { name: name, id: id, classCode: savedCode };
+    sessionStorage.setItem('garden_teacher', JSON.stringify(currentTeacher));
+    loadTeacherData();
+    errEl.style.display = 'none';
+    showDashboardView();
+
+  } catch(err) {
+    console.error('로그인 오류:', err);
+    errEl.textContent = '오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
+    errEl.style.display = 'block';
+  }
+
+  btn.textContent = '로그인하기 🌸';
+  btn.disabled = false;
+}
+
+function generateCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+document.getElementById('input-pw').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+function doLogout() {
+  currentTeacher = null;
+  sessionStorage.removeItem('garden_teacher');
+  stopPolling();
+  document.getElementById('dashboard').classList.remove('active');
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('qr-panel').classList.remove('active');
+  selectedWorks.clear();
+  updateSelectedUI();
+}
+
+function showDashboardView() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').classList.add('active');
+  document.getElementById('welcome-name').textContent = currentTeacher.name;
+  startPolling();
+  renderWorks();
+}
+
+// 페이지 로드 시 세션 복원
+(function restoreSession() {
+  const saved = sessionStorage.getItem('garden_teacher');
+  if (saved) {
+    try {
+      currentTeacher = JSON.parse(saved);
+      showDashboardView();
+    } catch(e) {
+      sessionStorage.removeItem('garden_teacher');
+    }
+  }
+})();
+
+function startPolling() {
+  stopPolling();
+  pollTimer = // Firebase 실시간 구독으로 대체
+}
+
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+// ===== 수업 생성 + QR =====
+function createClass() {
+  const url = getGardenURL();
+  const panel = document.getElementById('qr-panel');
+  panel.classList.add('active');
+  document.getElementById('qr-url-text').textContent = url;
+
+  if (qrInstance) { qrInstance.clear(); qrInstance.makeCode(url); return; }
+
+  document.getElementById('qr-code').innerHTML = '';
+  qrInstance = new QRCode(document.getElementById('qr-code'), {
+    text: url,
+    width: 180, height: 180,
+    colorDark: '#2D3748', colorLight: '#FFFFFF',
+    correctLevel: QRCode.CorrectLevel.H
+  });
+}
+
+function saveQR() {
+  const canvas = document.querySelector('#qr-code canvas');
+  const img = document.querySelector('#qr-code img');
+  let src = '';
+  if (canvas) src = canvas.toDataURL('image/png');
+  else if (img) src = img.src;
+  if (!src) { showToast('QR 코드를 먼저 생성해 주세요.'); return; }
+
+  const a = document.createElement('a');
+  a.href = src; a.download = '나의작은정원_QR.png'; a.click();
+  showToast('QR 코드가 저장되었어요! 📲');
+}
+
+// ===== 작품 렌더링 =====
+function renderWorks() {
+  const grid = document.getElementById('works-grid');
+  const empty = document.getElementById('empty-state');
+  const count = document.getElementById('works-count');
+  count.textContent = works.length + '개';
+
+  if (works.length === 0) {
+    grid.innerHTML = '';
+    grid.appendChild(empty);
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const emojis = ['🌸','🌼','🌻','🌹','🌷','🌺','🍀','🌿'];
+  grid.innerHTML = '';
+  works.forEach((w, i) => {
+    const card = document.createElement('div');
+    card.className = 'work-card' + (selectedWorks.has(w.id) ? ' selected' : '');
+    card.id = 'card-' + w.id;
+
+    // 상단 바: 체크박스
+    const topBar = document.createElement('div');
+    topBar.className = 'work-card-top';
+
+    const cb = document.createElement('div');
+    cb.className = 'work-checkbox';
+    cb.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9.5 10,2.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    cb.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (selectedWorks.has(w.id)) selectedWorks.delete(w.id);
+      else selectedWorks.add(w.id);
+      card.classList.toggle('selected', selectedWorks.has(w.id));
+      cb.querySelector('svg').style.display = selectedWorks.has(w.id) ? 'block' : 'none';
+      cb.style.background = selectedWorks.has(w.id) ? '#48BB78' : 'white';
+      cb.style.borderColor = selectedWorks.has(w.id) ? '#48BB78' : '#CBD5E0';
+      updateSelectedUI();
+    });
+    topBar.appendChild(cb);
+
+    // 썸네일
+    let thumbEl;
+    if (w.thumb) {
+      thumbEl = document.createElement('img');
+      thumbEl.className = 'work-thumb';
+      thumbEl.src = w.thumb;
+      thumbEl.alt = w.student + '의 정원';
+    } else {
+      thumbEl = document.createElement('div');
+      thumbEl.className = 'work-thumb-placeholder';
+      thumbEl.textContent = emojis[i % emojis.length];
+    }
+
+    // 이름/날짜
+    const info = document.createElement('div');
+    info.className = 'work-info';
+    info.innerHTML = '<div class="work-name">' + w.student + '</div><div class="work-date">' + w.date + '</div>';
+
+    card.appendChild(topBar);
+    card.appendChild(thumbEl);
+    card.appendChild(info);
+    card.addEventListener('click', () => openPreview(w.id));
+
+    grid.appendChild(card);
+  });
+}
+
+function handleCardClick(event, id) {
+  if (event.target.closest('.work-checkbox')) return;
+  openPreview(id);
+}
+
+function toggleSelect(id) {
+  if (selectedWorks.has(id)) selectedWorks.delete(id);
+  else selectedWorks.add(id);
+  updateSelectedUI();
+  renderWorks();
+}
+
+function toggleSelectAll() {
+  if (selectedWorks.size === works.length) {
+    selectedWorks.clear();
+  } else {
+    works.forEach(w => selectedWorks.add(w.id));
+  }
+  updateSelectedUI();
+  renderWorks();
+}
+
+function updateSelectedUI() {
+  const btn = document.getElementById('qr-selected-btn');
+  const selectBtn = document.querySelector('.select-all-btn');
+  if (selectedWorks.size > 0) {
+    btn.classList.add('visible');
+    btn.textContent = `📲 선택 QR 저장 (${selectedWorks.size}개)`;
+    selectBtn.textContent = selectedWorks.size === works.length ? '전체 해제' : '전체 선택';
+  } else {
+    btn.classList.remove('visible');
+    btn.textContent = '📲 선택 QR 저장';
+    selectBtn.textContent = '전체 선택';
+  }
+}
+
+// ===== 미리보기 모달 =====
+function openPreview(id) {
+  const work = works.find(w => w.id === id);
+  if (!work) return;
+  previewWorkId = id;
+  document.getElementById('modal-student-name').textContent = work.student + '의 정원';
+  document.getElementById('modal-work-date').textContent = work.date;
+
+  const img = document.getElementById('modal-img');
+  const ph = document.getElementById('modal-placeholder');
+  if (work.thumb) { img.src = work.thumb; img.style.display = 'block'; ph.style.display = 'none'; }
+  else { img.style.display = 'none'; ph.style.display = 'flex'; }
+
+  document.getElementById('preview-modal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('preview-modal').classList.remove('active');
+  previewWorkId = null;
+}
+
+function deleteWork() {
+  if (!previewWorkId) return;
+  const idx = works.findIndex(w => w.id === previewWorkId);
+  if (idx < 0) return;
+  const deleted = works.splice(idx, 1)[0];
+  deleted.deletedAt = new Date().toLocaleDateString('ko-KR');
+  trashWorks.unshift(deleted);
+  saveWorks(); saveTrash();
+  selectedWorks.delete(previewWorkId);
+  updateSelectedUI();
+  closeModal();
+  renderWorks();
+  showToast('작품이 휴지통으로 이동했어요 🗑');
+}
+
+// ===== QR 모달 (선택 작품) =====
+function openQRSelectedModal() {
+  const selected = works.filter(w => selectedWorks.has(w.id));
+  if (selected.length === 0) { showToast('작품을 선택해 주세요.'); return; }
+
+  const isAll = selected.length === works.length;
+  document.getElementById('qr-modal-title').textContent =
+    isAll ? '전체 작품 QR 코드 (PDF 저장)' : `선택 작품 QR 코드 (${selected.length}개)`;
+  document.getElementById('qr-modal-sub').textContent =
+    isAll ? '전체 선택 시 PDF 형태로 저장돼요' : selected.map(w => w.student).join(', ');
+
+  const saveBtn = document.getElementById('qr-modal-save-btn');
+  saveBtn.textContent = isAll ? '⬇ PDF로 저장' : '⬇ QR 저장';
+  saveBtn.onclick = isAll ? saveAllAsPDF : saveSelectedQR;
+
+  // QR 생성 (첫 번째 작품 URL)
+  document.getElementById('qr-modal-canvas').innerHTML = '';
+  qrModalInstance = new QRCode(document.getElementById('qr-modal-canvas'), {
+    text: selected[0].url || getGardenURL(),
+    width: 200, height: 200,
+    colorDark: '#2D3748', colorLight: '#FFFFFF',
+    correctLevel: QRCode.CorrectLevel.H
+  });
+
+  document.getElementById('qr-modal').classList.add('active');
+}
+
+function closeQRModal() {
+  document.getElementById('qr-modal').classList.remove('active');
+}
+
+function saveSelectedQR() {
+  const canvas = document.querySelector('#qr-modal-canvas canvas');
+  const img = document.querySelector('#qr-modal-canvas img');
+  let src = '';
+  if (canvas) src = canvas.toDataURL('image/png');
+  else if (img) src = img.src;
+  if (!src) { showToast('QR 생성 중이에요. 잠시 후 시도해 주세요.'); return; }
+  const a = document.createElement('a');
+  a.href = src; a.download = '학생작품_QR.png'; a.click();
+  closeQRModal();
+  showToast('QR 코드가 저장되었어요! 📲');
+}
+
+async function saveAllAsPDF() {
+  showToast('PDF 생성 중... 잠시만 기다려 주세요 📄');
+  closeQRModal();
+  await new Promise(r => setTimeout(r, 300));
+
+  const { jsPDF } = window.jspdf;
+  const pageW = 210, pageH = 297;
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  for (let i = 0; i < works.length; i++) {
+    const w = works[i];
+    if (i > 0) doc.addPage();
+
+    // ── 페이지 헤더 ──
+    doc.setFillColor(247, 249, 252);
+    doc.rect(0, 0, pageW, pageH, 'F');
+
+    // 상단 장식선
+    doc.setDrawColor(123, 200, 164);
+    doc.setLineWidth(1.2);
+    doc.line(20, 22, pageW - 20, 22);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(160, 160, 160);
+    doc.text('나의 작은 정원 · My Little Garden', pageW / 2, 16, { align: 'center' });
+
+    // 학생 이름
+    doc.setFontSize(28);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(45, 55, 72);
+    doc.text(w.student, pageW / 2, 52, { align: 'center' });
+
+    // 이름 아래 날짜
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(160, 160, 160);
+    doc.text(w.date, pageW / 2, 62, { align: 'center' });
+
+    // QR 임시 생성
+    const tmpDiv = document.createElement('div');
+    tmpDiv.style.position = 'fixed';
+    tmpDiv.style.left = '-9999px';
+    document.body.appendChild(tmpDiv);
+    new QRCode(tmpDiv, {
+      text: w.url || getGardenURL(), width: 400, height: 400,
+      colorDark: '#2D3748', colorLight: '#FFFFFF',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+    await new Promise(r => setTimeout(r, 300));
+    const qrCanvas = tmpDiv.querySelector('canvas');
+    const qrImg = tmpDiv.querySelector('img');
+    let qrSrc = '';
+    if (qrCanvas) qrSrc = qrCanvas.toDataURL('image/png');
+    else if (qrImg) qrSrc = qrImg.src;
+    document.body.removeChild(tmpDiv);
+
+    // QR 이미지 — A4 중앙에 크게
+    const qrSize = 130;
+    const qrX = (pageW - qrSize) / 2;
+    const qrY = 78;
+    if (qrSrc) {
+      // 흰 배경 카드
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 4, 4, 'FD');
+      doc.addImage(qrSrc, 'PNG', qrX, qrY, qrSize, qrSize);
+    }
+
+    // QR 아래 안내 문구
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(113, 128, 150);
+    doc.text('QR 코드를 스캔하면 나의 작은 정원이 열려요', pageW / 2, qrY + qrSize + 28, { align: 'center' });
+
+    // URL 작게
+    const url = (w.url || getGardenURL()).length > 60
+      ? (w.url || getGardenURL()).slice(0, 57) + '...'
+      : (w.url || getGardenURL());
+    doc.setFontSize(7.5);
+    doc.setTextColor(160, 160, 160);
+    doc.text(url, pageW / 2, qrY + qrSize + 36, { align: 'center' });
+
+    // 썸네일 (있을 경우)
+    if (w.thumb) {
+      try {
+        const thumbY = qrY + qrSize + 46;
+        const thumbW = 70, thumbH = 52;
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.3);
+        doc.roundedRect((pageW - thumbW) / 2 - 4, thumbY - 4, thumbW + 8, thumbH + 8, 3, 3, 'FD');
+        doc.addImage(w.thumb, 'PNG', (pageW - thumbW) / 2, thumbY, thumbW, thumbH);
+        doc.setFontSize(8);
+        doc.setTextColor(160, 160, 160);
+        doc.text('학생 작품 미리보기', pageW / 2, thumbY + thumbH + 8, { align: 'center' });
+      } catch(e) {}
+    }
+
+    // 하단 선 + 페이지 번호
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.5);
+    doc.line(20, pageH - 18, pageW - 20, pageH - 18);
+    doc.setFontSize(8);
+    doc.setTextColor(160, 160, 160);
+    doc.text((i + 1) + ' / ' + works.length, pageW / 2, pageH - 10, { align: 'center' });
+  }
+
+  doc.save('나의작은정원_전체QR.pdf');
+  showToast('PDF가 저장되었어요! 🎉');
+}
+
+// ===== 휴지통 =====
+function showTrash() {
+  document.getElementById('dashboard').classList.remove('active');
+  document.getElementById('trash-screen').classList.add('active');
+  renderTrash();
+}
+
+function showDashboard() {
+  document.getElementById('trash-screen').classList.remove('active');
+  document.getElementById('dashboard').classList.add('active');
+}
+
+function renderTrash() {
+  const grid = document.getElementById('trash-grid');
+  const empty = document.getElementById('trash-empty');
+  if (trashWorks.length === 0) {
+    grid.innerHTML = '';
+    grid.appendChild(empty);
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  const emojis = ['🌸','🌼','🌻','🌹','🌷','🌺','🍀','🌿'];
+  grid.innerHTML = trashWorks.map((w, i) => `
+    <div class="trash-card">
+      ${w.thumb
+        ? `<img class="trash-card-img" src="${w.thumb}" alt="${w.student}">`
+        : `<div class="trash-card-placeholder">${emojis[i % emojis.length]}</div>`
+      }
+      <div class="trash-card-info">
+        <div class="trash-card-name">${w.student}</div>
+        <div class="trash-card-date">삭제: ${w.deletedAt || w.date}</div>
+        <div class="trash-card-actions">
+          <button class="trash-restore-btn" onclick="restoreWork('${w.id}')">↩ 복구</button>
+          <button class="trash-delete-btn" onclick="permDelete('${w.id}')">✕ 영구 삭제</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function restoreWork(id) {
+  const idx = trashWorks.findIndex(w => w.id === id);
+  if (idx < 0) return;
+  const restored = trashWorks.splice(idx, 1)[0];
+  delete restored.deletedAt;
+  works.unshift(restored);
+  saveWorks(); saveTrash();
+  renderTrash();
+  showToast('작품이 복구되었어요! ✨');
+}
+
+function permDelete(id) {
+  if (!confirm('정말 영구 삭제할까요? 복구할 수 없어요.')) return;
+  const idx = trashWorks.findIndex(w => w.id === id);
+  if (idx < 0) return;
+  trashWorks.splice(idx, 1);
+  saveTrash();
+  renderTrash();
+  showToast('영구 삭제되었어요.');
+}
+
+// ===== 토스트 =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
