@@ -276,21 +276,20 @@ body {
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
 }
-.work-checkbox svg { display: none; width: 12px; height: 12px; }
+.work-checkbox svg { display: none; width: 14px; height: 14px; }
 .work-checkbox.checked {
   background: #48BB78 !important;
   border-color: #48BB78 !important;
 }
-.work-checkbox.checked::after {
-  content: '✓';
-  color: white;
-  font-size: 13px;
-  font-weight: 900;
-  line-height: 1;
+.work-checkbox.checked svg {
+  display: block !important;
 }
 .work-card.selected .work-checkbox {
   background: #48BB78 !important;
   border-color: #48BB78 !important;
+}
+.work-card.selected .work-checkbox svg {
+  display: block !important;
 }
 .work-thumb-placeholder {
   width: 100%; aspect-ratio: 4/3;
