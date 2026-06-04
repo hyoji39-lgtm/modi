@@ -802,7 +802,6 @@ function showDashboardView() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('dashboard').classList.add('active');
   document.getElementById('welcome-name').textContent = currentTeacher.name;
-  startPolling();
   renderWorks();
 }
 
@@ -812,6 +811,7 @@ function showDashboardView() {
   if (saved) {
     try {
       currentTeacher = JSON.parse(saved);
+      loadTeacherData();
       showDashboardView();
     } catch(e) {
       sessionStorage.removeItem('garden_teacher');
