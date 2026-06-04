@@ -923,7 +923,7 @@ function renderWorks() {
   grid.innerHTML = '';
   works.forEach((w, i) => {
     const card = document.createElement('div');
-    card.className = 'work-card' + (selectedWorks.has(w.id) ? ' selected' : '');
+    card.className = 'work-card' + (selectedWorks.has(String(w.id)) ? ' selected' : '');
     card.id = 'card-' + w.id;
 
     // 상단 바: 체크박스
@@ -932,28 +932,33 @@ function renderWorks() {
 
     const cb = document.createElement('div');
     cb.className = 'work-checkbox';
-    cb.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9.5 10,2.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function applyCheckStyle(checked) {
+      if (checked) {
+        cb.style.background = '#48BB78';
+        cb.style.borderColor = '#48BB78';
+        cb.innerHTML = '<svg viewBox="0 0 12 12" fill="none" style="width:14px;height:14px;display:block"><polyline points="2,6 5,9.5 10,2.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      } else {
+        cb.style.background = 'white';
+        cb.style.borderColor = '#CBD5E0';
+        cb.innerHTML = '<svg viewBox="0 0 12 12" fill="none" style="width:14px;height:14px;display:none"><polyline points="2,6 5,9.5 10,2.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
+    }
+
     // 초기 체크 상태 반영
     const isChecked = selectedWorks.has(String(w.id));
-    if (isChecked) {
-      cb.classList.add('checked');
-      cb.style.background  = '#48BB78';
-      cb.style.borderColor = '#48BB78';
-    }
+    applyCheckStyle(isChecked);
     card.classList.toggle('selected', isChecked);
+
     cb.addEventListener('click', function(e) {
       e.stopPropagation();
       const wid = String(w.id);
       if (selectedWorks.has(wid)) {
         selectedWorks.delete(wid);
-        cb.classList.remove('checked');
-        cb.style.background  = 'white';
-        cb.style.borderColor = '#CBD5E0';
+        applyCheckStyle(false);
       } else {
         selectedWorks.add(wid);
-        cb.classList.add('checked');
-        cb.style.background  = '#48BB78';
-        cb.style.borderColor = '#48BB78';
+        applyCheckStyle(true);
       }
       card.classList.toggle('selected', selectedWorks.has(wid));
       updateSelectedUI();
