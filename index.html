@@ -1356,23 +1356,28 @@ function restoreWork(id) {
 }
 
 function openTrashLightbox(src, name) {
-  const overlay = document.getElementById('trash-lightbox-overlay');
-  if (!overlay) {
-    // 동적으로 생성
-    const el = document.createElement('div');
-    el.id = 'trash-lightbox-overlay';
-    el.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;';
-    el.innerHTML = '<div style="position:relative;display:inline-flex;">'
-      + '<img id="trash-lb-img" style="max-width:calc(100vw - 48px);max-height:calc(100vh - 48px);width:auto;height:auto;object-fit:contain;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.5);" src="' + src + '" alt="' + name + '">'
-      + '<button onclick="document.getElementById('trash-lightbox-overlay').remove()" style="position:absolute;top:-12px;right:-12px;width:32px;height:32px;border-radius:50%;background:white;border:none;font-size:18px;cursor:pointer;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.2);">×</button>'
-      + '</div>';
-    el.addEventListener('click', function(e) { if (e.target === el) el.remove(); });
-    document.body.appendChild(el);
-  } else {
-    document.getElementById('trash-lb-img').src = src;
-    overlay.style.display = 'flex';
-  }
+  var existing = document.getElementById('trash-lightbox-overlay');
+  if (existing) existing.remove();
+  var el = document.createElement('div');
+  el.id = 'trash-lightbox-overlay';
+  el.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;';
+  var inner = document.createElement('div');
+  inner.style.cssText = 'position:relative;display:inline-flex;';
+  var img = document.createElement('img');
+  img.src = src;
+  img.alt = name;
+  img.style.cssText = 'max-width:calc(100vw - 48px);max-height:calc(100vh - 48px);width:auto;height:auto;object-fit:contain;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.5);';
+  var closeBtn = document.createElement('button');
+  closeBtn.textContent = '×';
+  closeBtn.style.cssText = 'position:absolute;top:-12px;right:-12px;width:32px;height:32px;border-radius:50%;background:white;border:none;font-size:18px;cursor:pointer;font-weight:700;';
+  closeBtn.onclick = function() { el.remove(); };
+  inner.appendChild(img);
+  inner.appendChild(closeBtn);
+  el.appendChild(inner);
+  el.addEventListener('click', function(e) { if (e.target === el) el.remove(); });
+  document.body.appendChild(el);
 }
+
 
 function permDelete(id) {
   document.getElementById('perm-delete-id').value = id;
