@@ -478,21 +478,9 @@ body {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
 </style>
-<!-- Firebase SDK (compat) -->
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script>
-  firebase.initializeApp({
-    apiKey: "AIzaSyCYCsrByMA-89BncHFCpAlQ9hjvSh5DF8Y",
-    authDomain: "my-little-garden-6207e.firebaseapp.com",
-    projectId: "my-little-garden-6207e",
-    storageBucket: "my-little-garden-6207e.firebasestorage.app",
-    messagingSenderId: "749338971935",
-    appId: "1:749338971935:web:f6985a2cd38c30e6a3ea2a"
-  });
-  var __db = firebase.firestore();
-  console.log('Firebase (교사 compat) OK');
-</script>
 </head>
 <body>
 
@@ -642,7 +630,7 @@ body {
 
 <script>
 // ===== 데이터 =====
-const // 교사 계정은 Firebase Firestore 'teachers' 컬렉션에서 관리
+// 교사 계정은 Firebase Firestore에서 관리
 
 let currentTeacher = null;
 let works = [];
@@ -664,20 +652,21 @@ function loadTeacherData() {
 }
 
 function startFirebaseListener() {
-  if (!__db || !currentTeacher) return;
-  const teacherId = currentTeacher.id;
-  const classCode = currentTeacher.classCode || '';
+  if (!currentTeacher) return;
+  var db = getDB();
+  var teacherId = currentTeacher.id;
+  var classCode = currentTeacher.classCode || '';
 
-  let q = __db.collection('gardens').where('teacherId', '==', teacherId);
+  var q = db.collection('gardens').where('teacherId', '==', teacherId);
   if (classCode && classCode !== 'unknown') {
     q = q.where('classCode', '==', classCode);
   }
   q = q.orderBy('createdAt', 'desc');
 
-  q.onSnapshot((snapshot) => {
-    const fbWorks = [];
-    snapshot.forEach(docSnap => {
-      const d = docSnap.data();
+  q.onSnapshot(function(snapshot) {
+    var fbWorks = [];
+    snapshot.forEach(function(docSnap) {
+      var d = docSnap.data();
       fbWorks.push({
         id: d.id || docSnap.id,
         docId: docSnap.id,
@@ -691,8 +680,7 @@ function startFirebaseListener() {
     works = fbWorks;
     try { localStorage.setItem(worksKey(), JSON.stringify(works)); } catch(e) {}
     renderWorks();
-    console.log('Firebase 업데이트:', works.length + '개');
-  }, (err) => {
+  }, function(err) {
     console.warn('Firebase 구독 오류:', err);
   });
 }
@@ -711,16 +699,30 @@ function getGardenURL() {
 }
 
 // ===== 로그인 =====
-async function doLogin() {
-  let name    = document.getElementById('input-name').value.trim();
-  const id    = document.getElementById('input-id').value.trim();
-  const pw    = document.getElementById('input-pw').value.trim();
-  const errEl = document.getElementById('login-error');
-  const btn   = document.querySelector('.login-btn');
+function getDB() {
+  if (!firebase.apps.length) {
+    firebase.initializeApp({
+      apiKey: "AIzaSyCYCsrByMA-89BncHFCpAlQ9hjvSh5DF8Y",
+      authDomain: "my-little-garden-6207e.firebaseapp.com",
+      projectId: "my-little-garden-6207e",
+      storageBucket: "my-little-garden-6207e.firebasestorage.app",
+      messagingSenderId: "749338971935",
+      appId: "1:749338971935:web:f6985a2cd38c30e6a3ea2a"
+    });
+  }
+  return firebase.firestore();
+}
+
+function doLogin() {
+  var nameVal = document.getElementById('input-name').value.trim();
+  var id      = document.getElementById('input-id').value.trim();
+  var pw      = document.getElementById('input-pw').value.trim();
+  var errEl   = document.getElementById('login-error');
+  var btn     = document.querySelector('.login-btn');
 
   errEl.style.display = 'none';
 
-  if (!name || !id || !pw) {
+  if (!nameVal || !id || !pw) {
     errEl.textContent = '이름, 아이디, 비밀번호를 모두 입력해 주세요.';
     errEl.style.display = 'block'; return;
   }
@@ -736,45 +738,45 @@ async function doLogin() {
   btn.textContent = '확인 중...';
   btn.disabled = true;
 
-  try {
-    const snap = await __db.collection('teachers').where('id', '==', id).get();
-
-    if (snap.empty) {
-      // 처음 로그인 → 계정 자동 생성
-      await __db.collection('teachers').add({
-        name: name, id: id, pw: pw,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    } else {
-      // 기존 계정 → 비번 확인
-      const account = snap.docs[0].data();
-      if (account.pw !== pw) {
-        errEl.textContent = '비밀번호가 맞지 않아요. 다시 확인해 주세요.';
-        errEl.style.display = 'block';
-        btn.textContent = '로그인하기 🌸';
-        btn.disabled = false;
-        return;
+  var db = getDB();
+  db.collection('teachers').where('id', '==', id).get()
+    .then(function(snap) {
+      if (snap.empty) {
+        return db.collection('teachers').add({
+          name: nameVal, id: id, pw: pw,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(function() { return nameVal; });
+      } else {
+        var account = snap.docs[0].data();
+        if (account.pw !== pw) {
+          errEl.textContent = '비밀번호가 맞지 않아요. 다시 확인해 주세요.';
+          errEl.style.display = 'block';
+          btn.textContent = '로그인하기 🌸';
+          btn.disabled = false;
+          return null;
+        }
+        return account.name;
       }
-      name = account.name;
-    }
-
-    const savedCode = localStorage.getItem('garden_classcode_' + id) || generateCode();
-    localStorage.setItem('garden_classcode_' + id, savedCode);
-
-    currentTeacher = { name: name, id: id, classCode: savedCode };
-    sessionStorage.setItem('garden_teacher', JSON.stringify(currentTeacher));
-    loadTeacherData();
-    errEl.style.display = 'none';
-    showDashboardView();
-
-  } catch(err) {
-    console.error('로그인 오류:', err);
-    errEl.textContent = '오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
-    errEl.style.display = 'block';
-  }
-
-  btn.textContent = '로그인하기 🌸';
-  btn.disabled = false;
+    })
+    .then(function(resolvedName) {
+      if (resolvedName === null || resolvedName === undefined) return;
+      var savedCode = localStorage.getItem('garden_classcode_' + id) || generateCode();
+      localStorage.setItem('garden_classcode_' + id, savedCode);
+      currentTeacher = { name: resolvedName, id: id, classCode: savedCode };
+      sessionStorage.setItem('garden_teacher', JSON.stringify(currentTeacher));
+      loadTeacherData();
+      errEl.style.display = 'none';
+      showDashboardView();
+      btn.textContent = '로그인하기 🌸';
+      btn.disabled = false;
+    })
+    .catch(function(err) {
+      console.error('로그인 오류:', err);
+      errEl.textContent = '오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
+      errEl.style.display = 'block';
+      btn.textContent = '로그인하기 🌸';
+      btn.disabled = false;
+    });
 }
 
 function generateCode() {
