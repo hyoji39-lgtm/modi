@@ -510,6 +510,12 @@ body {
   .confirm-no-btn:hover { border-color: #A0AEC0; }
   .confirm-yes-btn:hover { opacity: 0.9; }
 
+
+.works-header { margin-bottom: 20px; }
+.works-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.works-actions-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.deselect-btn { display: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; border: 1.5px solid #CBD5E0; background: white; color: #718096; transition: all 0.2s; }
+.deselect-btn.visible { display: inline-flex; align-items: center; gap: 6px; }
 </style>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -585,15 +591,17 @@ body {
     <!-- 학생 작품 목록 -->
     <div class="works-section">
       <div class="works-header">
-        <div class="works-title">🎨 학생 작품 목록</div>
-        <span class="works-count" id="works-count">0개</span>
-        <button class="select-all-btn" onclick="toggleSelectAll()">전체 선택</button>
-        <button class="qr-selected-btn" id="qr-selected-btn" onclick="openQRSelectedModal()">
-          📲 선택 QR 저장
-        </button>
-        <button class="trash-btn" onclick="showTrash()">
-          🗑 휴지통
-        </button>
+        <div class="works-title-row">
+          <div class="works-title">🎨 학생 작품 목록</div>
+          <span class="works-count" id="works-count">0개</span>
+        </div>
+        <div class="works-actions-row">
+          <button class="select-all-btn" onclick="toggleSelectAll()">전체 선택</button>
+          <button class="qr-selected-btn" id="qr-selected-btn" onclick="openQRSelectedModal()">📲 선택 QR 저장</button>
+          <button class="delete-selected-btn" id="delete-selected-btn" onclick="deleteSelectedWorks()">🗑 삭제</button>
+          <button class="deselect-btn" id="deselect-btn" onclick="deselectAll()">✕ 선택 해제</button>
+          <button class="trash-btn" onclick="showTrash()">🗑 휴지통</button>
+        </div>
       </div>
       <div class="works-grid" id="works-grid">
         <div class="empty-state" id="empty-state">
@@ -979,6 +987,12 @@ function toggleSelect(id) {
   renderWorks();
 }
 
+function deselectAll() {
+  selectedWorks.clear();
+  updateSelectedUI();
+  renderWorks();
+}
+
 function toggleSelectAll() {
   if (selectedWorks.size === works.length) {
     selectedWorks.clear();
@@ -992,16 +1006,19 @@ function toggleSelectAll() {
 function updateSelectedUI() {
   const btn = document.getElementById('qr-selected-btn');
   const delBtn = document.getElementById('delete-selected-btn');
+  const deselectBtn = document.getElementById('deselect-btn');
   const selectBtn = document.querySelector('.select-all-btn');
   if (selectedWorks.size > 0) {
     btn.classList.add('visible');
     btn.textContent = '📲 선택 QR 저장 (' + selectedWorks.size + '개)';
-    if (delBtn) { delBtn.classList.add('visible'); delBtn.textContent = '🗑 선택 삭제 (' + selectedWorks.size + '개)'; }
+    if (delBtn) { delBtn.classList.add('visible'); delBtn.textContent = '🗑 삭제 (' + selectedWorks.size + '개)'; }
+    if (deselectBtn) deselectBtn.classList.add('visible');
     selectBtn.textContent = selectedWorks.size === works.length ? '전체 해제' : '전체 선택';
   } else {
     btn.classList.remove('visible');
     btn.textContent = '📲 선택 QR 저장';
     if (delBtn) delBtn.classList.remove('visible');
+    if (deselectBtn) deselectBtn.classList.remove('visible');
     selectBtn.textContent = '전체 선택';
   }
 }
@@ -1020,19 +1037,29 @@ function confirmDelete() {
   document.getElementById('delete-confirm-modal').classList.remove('active');
   var db = getDB();
   var promises = [];
+  var toDelete = [];
   selectedWorks.forEach(function(id) {
     var w = works.find(function(x) { return String(x.id) === String(id); });
-    if (w && w.docId) {
-      promises.push(db.collection('gardens').doc(w.docId).delete());
+    if (w) {
+      toDelete.push(w);
+      if (w.docId) promises.push(db.collection('gardens').doc(w.docId).delete());
     }
   });
-  Promise.all(promises).then(function() {
-    selectedWorks.clear();
-    updateSelectedUI();
-    showToast('삭제됐어요 🗑');
-  }).catch(function(err) {
-    console.error('삭제 오류:', err);
-    showToast('삭제 중 오류가 발생했어요');
+  // 화면에서 즉시 제거
+  toDelete.forEach(function(w) {
+    var idx = works.indexOf(w);
+    if (idx > -1) works.splice(idx, 1);
+    // 휴지통에 추가
+    w.deletedAt = new Date().toLocaleString('ko-KR');
+    trashWorks.unshift(w);
+  });
+  saveTrash();
+  selectedWorks.clear();
+  updateSelectedUI();
+  renderWorks();
+  showToast('삭제됐어요 🗑');
+  Promise.all(promises).catch(function(err) {
+    console.error('Firebase 삭제 오류:', err);
   });
 }
 
