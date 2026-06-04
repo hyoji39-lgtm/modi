@@ -477,6 +477,39 @@ body {
   z-index: 2000; pointer-events: none; white-space: nowrap;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
+
+  /* ===== 확인 모달 ===== */
+  .confirm-modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5); z-index: 99999;
+    align-items: center; justify-content: center;
+  }
+  .confirm-modal-overlay.active { display: flex; }
+  .confirm-modal {
+    background: white; border-radius: 20px; padding: 32px 28px;
+    text-align: center; max-width: 320px; width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .confirm-emoji { font-size: 44px; margin-bottom: 12px; }
+  .confirm-modal h3 { font-size: 18px; font-weight: 700; color: #2D3748; margin-bottom: 10px; }
+  .confirm-modal p { font-size: 14px; color: #718096; line-height: 1.6; margin-bottom: 24px; }
+  .confirm-btns { display: flex; gap: 10px; }
+  .confirm-no-btn {
+    flex: 1; padding: 13px; border-radius: 12px;
+    border: 2px solid #E2E8F0; background: white;
+    color: #718096; font-size: 15px; font-weight: 700;
+    font-family: inherit; cursor: pointer;
+  }
+  .confirm-yes-btn {
+    flex: 1; padding: 13px; border-radius: 12px;
+    border: none; background: #48BB78; color: white;
+    font-size: 15px; font-weight: 700;
+    font-family: inherit; cursor: pointer;
+  }
+  .confirm-yes-btn.danger { background: #E53E3E; }
+  .confirm-no-btn:hover { border-color: #A0AEC0; }
+  .confirm-yes-btn:hover { opacity: 0.9; }
+
 </style>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -888,6 +921,12 @@ function renderWorks() {
     const cb = document.createElement('div');
     cb.className = 'work-checkbox';
     cb.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9.5 10,2.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    // 초기 체크 상태 반영
+    const isChecked = selectedWorks.has(w.id);
+    cb.querySelector('svg').style.display = isChecked ? 'block' : 'none';
+    cb.style.background   = isChecked ? '#48BB78' : 'white';
+    cb.style.borderColor  = isChecked ? '#48BB78' : '#CBD5E0';
+    card.classList.toggle('selected', isChecked);
     cb.addEventListener('click', function(e) {
       e.stopPropagation();
       if (selectedWorks.has(w.id)) selectedWorks.delete(w.id);
@@ -968,7 +1007,16 @@ function updateSelectedUI() {
 
 function deleteSelectedWorks() {
   if (selectedWorks.size === 0) return;
-  if (!confirm(selectedWorks.size + '개 작품을 삭제할까요?')) return;
+  showDeleteConfirm(selectedWorks.size);
+}
+
+function showDeleteConfirm(count) {
+  document.getElementById('delete-confirm-count').textContent = count;
+  document.getElementById('delete-confirm-modal').classList.add('active');
+}
+
+function confirmDelete() {
+  document.getElementById('delete-confirm-modal').classList.remove('active');
   var db = getDB();
   var promises = [];
   selectedWorks.forEach(function(id) {
@@ -985,6 +1033,10 @@ function deleteSelectedWorks() {
     console.error('삭제 오류:', err);
     showToast('삭제 중 오류가 발생했어요');
   });
+}
+
+function cancelDelete() {
+  document.getElementById('delete-confirm-modal').classList.remove('active');
 }
 
 // ===== 미리보기 모달 =====
@@ -1227,6 +1279,17 @@ function restoreWork(id) {
   if (idx < 0) return;
   const restored = trashWorks.splice(idx, 1)[0];
   delete restored.deletedAt;
+  // Firebase에 복구
+  if (restored.docId) {
+    getDB().collection('gardens').doc(restored.docId).set({
+      id: String(restored.id),
+      name: restored.student || '이름 없음',
+      teacherId: currentTeacher ? currentTeacher.id : 'unknown',
+      classCode: currentTeacher ? currentTeacher.classCode : 'unknown',
+      imgData: restored.thumb || '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(function(){});
+  }
   works.unshift(restored);
   saveWorks(); saveTrash();
   renderTrash();
@@ -1234,13 +1297,28 @@ function restoreWork(id) {
 }
 
 function permDelete(id) {
-  if (!confirm('정말 영구 삭제할까요? 복구할 수 없어요.')) return;
+  document.getElementById('perm-delete-id').value = id;
+  document.getElementById('perm-delete-modal').classList.add('active');
+}
+
+function confirmPermDelete() {
+  const id = document.getElementById('perm-delete-id').value;
+  document.getElementById('perm-delete-modal').classList.remove('active');
+  // Firebase에서도 삭제
+  const w = trashWorks.find(x => x.id === id);
+  if (w && w.docId) {
+    getDB().collection('gardens').doc(w.docId).delete().catch(function(){});
+  }
   const idx = trashWorks.findIndex(w => w.id === id);
   if (idx < 0) return;
   trashWorks.splice(idx, 1);
   saveTrash();
   renderTrash();
   showToast('영구 삭제되었어요.');
+}
+
+function cancelPermDelete() {
+  document.getElementById('perm-delete-modal').classList.remove('active');
 }
 
 // ===== 토스트 =====
@@ -1251,5 +1329,33 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2800);
 }
 </script>
+
+<!-- 선택 삭제 확인 모달 -->
+<div class="confirm-modal-overlay" id="delete-confirm-modal">
+  <div class="confirm-modal">
+    <div class="confirm-emoji">🗑</div>
+    <h3>작품을 삭제할까요?</h3>
+    <p>선택한 <strong id="delete-confirm-count">0</strong>개의 작품을 삭제하시겠습니까?<br>삭제된 작품은 휴지통에서 확인할 수 있어요.</p>
+    <div class="confirm-btns">
+      <button class="confirm-no-btn" onclick="cancelDelete()">아니오</button>
+      <button class="confirm-yes-btn" onclick="confirmDelete()">예, 삭제할게요</button>
+    </div>
+  </div>
+</div>
+
+<!-- 영구 삭제 확인 모달 -->
+<input type="hidden" id="perm-delete-id">
+<div class="confirm-modal-overlay" id="perm-delete-modal">
+  <div class="confirm-modal">
+    <div class="confirm-emoji">⚠️</div>
+    <h3>영구 삭제할까요?</h3>
+    <p>이 작품을 영구 삭제하면<br>복구할 수 없어요.</p>
+    <div class="confirm-btns">
+      <button class="confirm-no-btn" onclick="cancelPermDelete()">아니오</button>
+      <button class="confirm-yes-btn danger" onclick="confirmPermDelete()">예, 영구 삭제</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
