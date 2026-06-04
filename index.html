@@ -951,16 +951,40 @@ function toggleSelectAll() {
 
 function updateSelectedUI() {
   const btn = document.getElementById('qr-selected-btn');
+  const delBtn = document.getElementById('delete-selected-btn');
   const selectBtn = document.querySelector('.select-all-btn');
   if (selectedWorks.size > 0) {
     btn.classList.add('visible');
-    btn.textContent = `📲 선택 QR 저장 (${selectedWorks.size}개)`;
+    btn.textContent = '📲 선택 QR 저장 (' + selectedWorks.size + '개)';
+    if (delBtn) { delBtn.classList.add('visible'); delBtn.textContent = '🗑 선택 삭제 (' + selectedWorks.size + '개)'; }
     selectBtn.textContent = selectedWorks.size === works.length ? '전체 해제' : '전체 선택';
   } else {
     btn.classList.remove('visible');
     btn.textContent = '📲 선택 QR 저장';
+    if (delBtn) delBtn.classList.remove('visible');
     selectBtn.textContent = '전체 선택';
   }
+}
+
+function deleteSelectedWorks() {
+  if (selectedWorks.size === 0) return;
+  if (!confirm(selectedWorks.size + '개 작품을 삭제할까요?')) return;
+  var db = getDB();
+  var promises = [];
+  selectedWorks.forEach(function(id) {
+    var w = works.find(function(x) { return String(x.id) === String(id); });
+    if (w && w.docId) {
+      promises.push(db.collection('gardens').doc(w.docId).delete());
+    }
+  });
+  Promise.all(promises).then(function() {
+    selectedWorks.clear();
+    updateSelectedUI();
+    showToast('삭제됐어요 🗑');
+  }).catch(function(err) {
+    console.error('삭제 오류:', err);
+    showToast('삭제 중 오류가 발생했어요');
+  });
 }
 
 // ===== 미리보기 모달 =====
