@@ -693,8 +693,8 @@ function saveTrash() {
 
 // 선생님 ID + 수업 코드를 포함한 학생용 URL 생성
 function getGardenURL() {
-  const base = location.href.replace('teacher_garden_v1.html', 'index.html');
-  const classCode = currentTeacher.classCode || '';
+  var base = 'https://my-little-garden-orpin.vercel.app/';
+  var classCode = currentTeacher.classCode || '';
   return base + '?teacher=' + currentTeacher.id + '&class=' + classCode;
 }
 
