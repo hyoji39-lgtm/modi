@@ -1017,7 +1017,25 @@ function toggleSelectAll() {
     works.forEach(w => selectedWorks.add(String(w.id)));
   }
   updateSelectedUI();
-  renderWorks();
+  // renderWorks() 대신 DOM 직접 업데이트
+  document.querySelectorAll('.work-card').forEach(function(card) {
+    var id = card.id.replace('card-', '');
+    var cb = card.querySelector('.work-checkbox');
+    if (!cb) return;
+    if (selectedWorks.has(id)) {
+      card.classList.add('selected');
+      cb.style.background = '#48BB78';
+      cb.style.borderColor = '#48BB78';
+      var svg = cb.querySelector('svg');
+      if (svg) svg.style.display = 'block';
+    } else {
+      card.classList.remove('selected');
+      cb.style.background = 'white';
+      cb.style.borderColor = '#CBD5E0';
+      var svg = cb.querySelector('svg');
+      if (svg) svg.style.display = 'none';
+    }
+  });
 }
 
 function updateSelectedUI() {
