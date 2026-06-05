@@ -386,7 +386,7 @@ body {
 }
 .qr-modal-title { font-size: 16px; font-weight: 800; color: #2D3748; margin-bottom: 6px; }
 .qr-modal-sub { font-size: 13px; color: #718096; margin-bottom: 20px; }
-#qr-modal-canvas { margin: 0 auto; border-radius: 12px; overflow: hidden; }
+#qr-modal-canvas { margin: 0 auto; border-radius: 12px; overflow: hidden; display: flex; justify-content: center; }
 .qr-modal-actions { display: flex; gap: 10px; margin-top: 20px; }
 .qr-modal-btn {
   flex: 1; padding: 11px; border-radius: 12px;
@@ -1160,10 +1160,21 @@ function openQRSelectedModal() {
   document.getElementById('qr-modal-canvas').innerHTML = '';
   qrModalInstance = new QRCode(document.getElementById('qr-modal-canvas'), {
     text: selected[0].url || getGardenURL(),
-    width: 200, height: 200,
+    width: 260, height: 260,
     colorDark: '#2D3748', colorLight: '#FFFFFF',
     correctLevel: QRCode.CorrectLevel.H
   });
+  // 나무 이모지 중앙 오버레이
+  setTimeout(() => {
+    const qc = document.querySelector('#qr-modal-canvas canvas');
+    if (!qc) return;
+    const ctx2 = qc.getContext('2d');
+    const cx = qc.width / 2, cy = qc.height / 2, r = qc.width * 0.11;
+    ctx2.fillStyle = '#FFFFFF';
+    ctx2.beginPath(); ctx2.arc(cx, cy, r, 0, Math.PI*2); ctx2.fill();
+    ctx2.font = (r*1.5)+'px serif'; ctx2.textAlign='center'; ctx2.textBaseline='middle';
+    ctx2.fillText('🌳', cx, cy);
+  }, 200);
 
   document.getElementById('qr-modal').classList.add('active');
 }
