@@ -1241,37 +1241,35 @@ function drawQRCard(qrSrc, studentName) {
       ctx.fillText(studentName, badgeCX, badgeCY);
       ctx.restore();
 
-      // ── 흰색 반투명 카드: 배경 이미지 흰 사각형 위에 정확히 겹치게
-      // 배경의 흰 직사각형 위치: Y=354~570, X=150~650 (측정 기반)
-      const cardX = 148, cardY = 352;
-      const cardW = 504, cardH = 218;
-      const cardR = 18;
+      // ── 흰색 불투명 정사각형 카드 + QR 꽉 채우기
+      const cardSize = 420;
+      const cardX = (W - cardSize) / 2;
+      const cardY = 340;
+      const cardR = 20;
 
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(cardX + cardR, cardY);
-      ctx.lineTo(cardX + cardW - cardR, cardY);
-      ctx.arcTo(cardX + cardW, cardY, cardX + cardW, cardY + cardR, cardR);
-      ctx.lineTo(cardX + cardW, cardY + cardH - cardR);
-      ctx.arcTo(cardX + cardW, cardY + cardH, cardX + cardW - cardR, cardY + cardH, cardR);
-      ctx.lineTo(cardX + cardR, cardY + cardH);
-      ctx.arcTo(cardX, cardY + cardH, cardX, cardY + cardH - cardR, cardR);
+      ctx.lineTo(cardX + cardSize - cardR, cardY);
+      ctx.arcTo(cardX + cardSize, cardY, cardX + cardSize, cardY + cardR, cardR);
+      ctx.lineTo(cardX + cardSize, cardY + cardSize - cardR);
+      ctx.arcTo(cardX + cardSize, cardY + cardSize, cardX + cardSize - cardR, cardY + cardSize, cardR);
+      ctx.lineTo(cardX + cardR, cardY + cardSize);
+      ctx.arcTo(cardX, cardY + cardSize, cardX, cardY + cardSize - cardR, cardR);
       ctx.lineTo(cardX, cardY + cardR);
       ctx.arcTo(cardX, cardY, cardX + cardR, cardY, cardR);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(255,255,255,0.88)';
-      ctx.shadowColor = 'rgba(0,0,0,0.12)';
-      ctx.shadowBlur = 20;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowColor = 'rgba(0,0,0,0.18)';
+      ctx.shadowBlur = 24;
       ctx.fill();
       ctx.restore();
 
-      // QR 코드: 카드 정중앙, 패딩 8px
-      const qrPad = 8;
-      const qrSize = Math.min(cardW, cardH) - qrPad * 2;
-      const cardCX = cardX + cardW / 2;
-      const cardCY = cardY + cardH / 2;
-      const qrX = cardCX - qrSize / 2;
-      const qrY = cardCY - qrSize / 2;
+      // QR 코드: 카드 안에 패딩 12px으로 꽉 채우기
+      const qrPad = 12;
+      const qrSize = cardSize - qrPad * 2;
+      const qrX = cardX + qrPad;
+      const qrY = cardY + qrPad;
 
       const qr = new Image();
       qr.onload = function() {
