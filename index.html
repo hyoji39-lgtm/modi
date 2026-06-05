@@ -1208,57 +1208,35 @@ function drawQRCard(qrSrc, studentName) {
       const bw = bgImg.width * scale, bh = bgImg.height * scale;
       ctx.drawImage(bgImg, (W - bw) / 2, (H - bh) / 2, bw, bh);
 
-      // ── 귤색 뱃지 위치 (원본 이미지 측정값 → 800x1100 비율 변환)
-      // 원본: X=493~914, Y=490~608 (이미지 크기 1414x2000)
-      const badgeCX = 703 * W / 1414;   // ~398
-      const badgeCY = 549 * H / 2000;   // ~302
-      const badgeW  = 421 * W / 1414;   // ~238
-      const badgeH  = 118 * H / 2000;   // ~65
+      // ── 귤색 뱃지 위치 (800x1100 리사이즈 기준 측정값)
+      // Y=272~334, X=279~517 → 중심(398, 303), 크기 238×62
+      const badgeCX = 398, badgeCY = 303;
+      const badgeW = 240, badgeH = 64;
       const bX = badgeCX - badgeW / 2;
       const bY = badgeCY - badgeH / 2;
-      const br = badgeH / 2;
 
+      // 이름 텍스트만 (배경 뱃지 위에 그냥 텍스트만 올림)
       ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(bX + br, bY);
-      ctx.lineTo(bX + badgeW - br, bY);
-      ctx.arcTo(bX + badgeW, bY, bX + badgeW, bY + br, br);
-      ctx.lineTo(bX + badgeW, bY + badgeH - br);
-      ctx.arcTo(bX + badgeW, bY + badgeH, bX + badgeW - br, bY + badgeH, br);
-      ctx.lineTo(bX + br, bY + badgeH);
-      ctx.arcTo(bX, bY + badgeH, bX, bY + badgeH - br, br);
-      ctx.lineTo(bX, bY + br);
-      ctx.arcTo(bX, bY, bX + br, bY, br);
-      ctx.closePath();
-      ctx.fillStyle = '#F5A623';
-      ctx.shadowColor = 'rgba(0,0,0,0.22)';
-      ctx.shadowBlur = 14;
-      ctx.shadowOffsetY = 4;
-      ctx.fill();
-      ctx.restore();
-
-      // 이름 텍스트 (뱃지 정중앙)
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold ' + Math.round(badgeH * 0.58) + 'px "Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 3;
+      const fontSize = Math.round(badgeH * 0.56);
+      ctx.font = 'bold ' + fontSize + 'px "Apple SD Gothic Neo","Noto Sans KR",sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.strokeText(studentName, badgeCX, badgeCY);
       ctx.fillText(studentName, badgeCX, badgeCY);
+      ctx.restore();
 
-      // ── 흰 카드 위치 (원본 측정값 → Canvas 비율 변환)
-      // 원본 흰 카드: 중앙 X≈707, Y=660~1035 → 유효 영역 Y=680~1000, X=250~1100
-      // Canvas 좌표
-      const cardLeft   = 250 * W / 1414;   // ~141
-      const cardRight  = 1100 * W / 1414;  // ~623
-      const cardTop    = 680 * H / 2000;   // ~374
-      const cardBot    = 1000 * H / 2000;  // ~550
-      const cardW = cardRight - cardLeft;
-      const cardH = cardBot - cardTop;
-      const cardCX = (cardLeft + cardRight) / 2;
-      const cardCY = (cardTop + cardBot) / 2;
+      // ── 흰 카드 위치 (800x1100 기준 측정값)
+      // Y=361~570, X=160~630 → 중심(395, 466), 크기 470×209
+      // 흰 카드는 직사각형이므로 QR은 정사각형으로 중앙 배치
+      const cardCX = 395, cardCY = 466;
+      const cardW = 468, cardH = 208;
 
-      // QR 코드 크기 (카드 내부, 패딩 포함)
-      const qrPad = 16;
-      const qrSize = Math.min(cardW, cardH) - qrPad * 2;
+      // QR 크기: 카드 안쪽, 아주 작은 여백만
+      const qrPad = 8;
+      const qrSize = Math.min(cardW, cardH) - qrPad * 2;  // 192
       const qrX = cardCX - qrSize / 2;
       const qrY = cardCY - qrSize / 2;
 
@@ -1272,6 +1250,7 @@ function drawQRCard(qrSrc, studentName) {
     bgImg.src = GARDEN_BG_SRC;
   });
 }
+
 
 async function saveAllAsPDF() {
   showToast('PDF 생성 중... 잠시만 기다려 주세요 📄');
