@@ -1265,15 +1265,36 @@ function drawQRCard(qrSrc, studentName) {
       ctx.fill();
       ctx.restore();
 
-      // QR 코드: 카드 안에 패딩 12px으로 꽉 채우기
+      // QR 코드: 카드 정중앙, 패딩 12px
       const qrPad = 12;
       const qrSize = cardSize - qrPad * 2;
-      const qrX = cardX + qrPad;
-      const qrY = cardY + qrPad;
+      const qrX = cardX + (cardSize - qrSize) / 2;
+      const qrY = cardY + (cardSize - qrSize) / 2;
 
       const qr = new Image();
       qr.onload = function() {
         ctx.drawImage(qr, qrX, qrY, qrSize, qrSize);
+
+        // 🌳 나무 이모지 QR 코드 중앙에
+        const emojiSize = Math.floor(qrSize * 0.18);
+        const emojiBg = Math.floor(emojiSize * 1.2);
+        const emojiBgX = qrX + qrSize / 2 - emojiBg / 2;
+        const emojiBgY = qrY + qrSize / 2 - emojiBg / 2;
+        // 흰 배경 원
+        ctx.save();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(qrX + qrSize / 2, qrY + qrSize / 2, emojiBg / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        // 이모지
+        ctx.save();
+        ctx.font = emojiSize + 'px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🌳', qrX + qrSize / 2, qrY + qrSize / 2);
+        ctx.restore();
+
         resolve(c.toDataURL('image/png'));
       };
       qr.src = qrSrc;
