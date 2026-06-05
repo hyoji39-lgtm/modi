@@ -1146,15 +1146,15 @@ function openQRSelectedModal() {
   const selected = works.filter(w => selectedWorks.has(w.id));
   if (selected.length === 0) { showToast('작품을 선택해 주세요.'); return; }
 
-  const isAll = selected.length === works.length;
+  const isMulti = selected.length > 1;
   document.getElementById('qr-modal-title').textContent =
-    isAll ? '전체 작품 QR 코드 (PDF 저장)' : `선택 작품 QR 코드 (${selected.length}개)`;
+    isMulti ? `선택 작품 QR 코드 (${selected.length}명, PDF)` : `${selected[0].student}의 QR 코드`;
   document.getElementById('qr-modal-sub').textContent =
-    isAll ? '전체 선택 시 PDF 형태로 저장돼요' : selected.map(w => w.student).join(', ');
+    isMulti ? selected.map(w => w.student).join(', ') + ' — PDF로 저장돼요' : 'PNG 이미지로 저장돼요';
 
   const saveBtn = document.getElementById('qr-modal-save-btn');
-  saveBtn.textContent = isAll ? '⬇ PDF로 저장' : '⬇ QR 저장';
-  saveBtn.onclick = isAll ? saveAllAsPDF : saveSelectedQR;
+  saveBtn.textContent = isMulti ? '⬇ PDF로 저장' : '⬇ QR 카드 저장';
+  saveBtn.onclick = isMulti ? saveAllAsPDF : saveSelectedQR;
 
   // QR 생성 (첫 번째 작품 URL)
   document.getElementById('qr-modal-canvas').innerHTML = '';
@@ -1173,215 +1173,146 @@ function closeQRModal() {
 }
 
 function saveSelectedQR() {
-  const qrCanvas = document.querySelector('#qr-modal-canvas canvas');
-  const qrImg = document.querySelector('#qr-modal-canvas img');
+  const qrCanvasEl = document.querySelector('#qr-modal-canvas canvas');
+  const qrImgEl = document.querySelector('#qr-modal-canvas img');
   let qrSrc = '';
-  if (qrCanvas) qrSrc = qrCanvas.toDataURL('image/png');
-  else if (qrImg) qrSrc = qrImg.src;
+  if (qrCanvasEl) qrSrc = qrCanvasEl.toDataURL('image/png');
+  else if (qrImgEl) qrSrc = qrImgEl.src;
   if (!qrSrc) { showToast('QR 생성 중이에요. 잠시 후 시도해 주세요.'); return; }
 
-  // 학생 이름 가져오기
   const selected = works.filter(w => selectedWorks.has(w.id));
   const studentName = selected.length > 0 ? selected[0].student : '학생';
 
-  // Canvas 합성
-  const W = 800, H = 1100;
-  const c = document.createElement('canvas');
-  c.width = W; c.height = H;
-  const ctx = c.getContext('2d');
+  drawQRCard(qrSrc, studentName).then(dataUrl => {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = studentName + '_정원QR.png';
+    a.click();
+    closeQRModal();
+    showToast('QR 카드가 저장되었어요! 🌿');
+  });
+}
 
-  const bgImg = new Image();
-  bgImg.onload = function() {
-    // 배경 이미지 (cover 방식)
-    const scale = Math.max(W / bgImg.width, H / bgImg.height);
-    const bw = bgImg.width * scale, bh = bgImg.height * scale;
-    ctx.drawImage(bgImg, (W - bw) / 2, (H - bh) / 2, bw, bh);
+// 배경 이미지 위에 이름 뱃지 + QR 코드를 정위치에 합성
+function drawQRCard(qrSrc, studentName) {
+  return new Promise(resolve => {
+    const W = 800, H = 1100;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
 
-    // 반투명 흰색 오버레이 (중앙 영역)
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillRect(0, 0, W, H);
+    const bgImg = new Image();
+    bgImg.onload = function() {
+      // 배경 cover
+      const scale = Math.max(W / bgImg.width, H / bgImg.height);
+      const bw = bgImg.width * scale, bh = bgImg.height * scale;
+      ctx.drawImage(bgImg, (W - bw) / 2, (H - bh) / 2, bw, bh);
 
-    // ── 귤색 이름 뱃지 ──
-    const bW = 440, bH = 90, bX = (W - bW) / 2, bY = 200;
-    const r = 45;
-    ctx.beginPath();
-    ctx.moveTo(bX + r, bY);
-    ctx.lineTo(bX + bW - r, bY);
-    ctx.arcTo(bX + bW, bY, bX + bW, bY + r, r);
-    ctx.lineTo(bX + bW, bY + bH - r);
-    ctx.arcTo(bX + bW, bY + bH, bX + bW - r, bY + bH, r);
-    ctx.lineTo(bX + r, bY + bH);
-    ctx.arcTo(bX, bY + bH, bX, bY + bH - r, r);
-    ctx.lineTo(bX, bY + r);
-    ctx.arcTo(bX, bY, bX + r, bY, r);
-    ctx.closePath();
-    ctx.fillStyle = '#F5A623';
-    ctx.shadowColor = 'rgba(0,0,0,0.18)';
-    ctx.shadowBlur = 16;
-    ctx.shadowOffsetY = 4;
-    ctx.fill();
+      // ── 귤색 뱃지 위치 (원본 이미지 측정값 → 800x1100 비율 변환)
+      // 원본: X=493~914, Y=490~608 (이미지 크기 1414x2000)
+      const badgeCX = 703 * W / 1414;   // ~398
+      const badgeCY = 549 * H / 2000;   // ~302
+      const badgeW  = 421 * W / 1414;   // ~238
+      const badgeH  = 118 * H / 2000;   // ~65
+      const bX = badgeCX - badgeW / 2;
+      const bY = badgeCY - badgeH / 2;
+      const br = badgeH / 2;
 
-    // 이름 텍스트
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 44px "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(studentName, W / 2, bY + bH / 2);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(bX + br, bY);
+      ctx.lineTo(bX + badgeW - br, bY);
+      ctx.arcTo(bX + badgeW, bY, bX + badgeW, bY + br, br);
+      ctx.lineTo(bX + badgeW, bY + badgeH - br);
+      ctx.arcTo(bX + badgeW, bY + badgeH, bX + badgeW - br, bY + badgeH, br);
+      ctx.lineTo(bX + br, bY + badgeH);
+      ctx.arcTo(bX, bY + badgeH, bX, bY + badgeH - br, br);
+      ctx.lineTo(bX, bY + br);
+      ctx.arcTo(bX, bY, bX + br, bY, br);
+      ctx.closePath();
+      ctx.fillStyle = '#F5A623';
+      ctx.shadowColor = 'rgba(0,0,0,0.22)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 4;
+      ctx.fill();
+      ctx.restore();
 
-    // ── 흰색 반투명 QR 카드 ──
-    const cardW = 420, cardH = 420, cardX = (W - cardW) / 2, cardY = 350;
-    const cr = 30;
-    ctx.beginPath();
-    ctx.moveTo(cardX + cr, cardY);
-    ctx.lineTo(cardX + cardW - cr, cardY);
-    ctx.arcTo(cardX + cardW, cardY, cardX + cardW, cardY + cr, cr);
-    ctx.lineTo(cardX + cardW, cardY + cardH - cr);
-    ctx.arcTo(cardX + cardW, cardY + cardH, cardX + cardW - cr, cardY + cardH, cr);
-    ctx.lineTo(cardX + cr, cardY + cardH);
-    ctx.arcTo(cardX, cardY + cardH, cardX, cardY + cardH - cr, cr);
-    ctx.lineTo(cardX, cardY + cr);
-    ctx.arcTo(cardX, cardY, cardX + cr, cardY, cr);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
-    ctx.shadowColor = 'rgba(0,0,0,0.18)';
-    ctx.shadowBlur = 36;
-    ctx.shadowOffsetY = 8;
-    ctx.fill();
+      // 이름 텍스트 (뱃지 정중앙)
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold ' + Math.round(badgeH * 0.58) + 'px "Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(studentName, badgeCX, badgeCY);
 
-    // QR 코드 이미지
-    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-    const qr = new Image();
-    qr.onload = function() {
-      const pad = 30;
-      ctx.drawImage(qr, cardX + pad, cardY + pad, cardW - pad*2, cardH - pad*2);
+      // ── 흰 카드 위치 (원본 측정값 → Canvas 비율 변환)
+      // 원본 흰 카드: 중앙 X≈707, Y=660~1035 → 유효 영역 Y=680~1000, X=250~1100
+      // Canvas 좌표
+      const cardLeft   = 250 * W / 1414;   // ~141
+      const cardRight  = 1100 * W / 1414;  // ~623
+      const cardTop    = 680 * H / 2000;   // ~374
+      const cardBot    = 1000 * H / 2000;  // ~550
+      const cardW = cardRight - cardLeft;
+      const cardH = cardBot - cardTop;
+      const cardCX = (cardLeft + cardRight) / 2;
+      const cardCY = (cardTop + cardBot) / 2;
 
-      // 안내 문구
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.font = '28px "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
-      ctx.fillText('QR코드로 나의 작은 정원에 입장해요!', W / 2, cardY + cardH + 70);
+      // QR 코드 크기 (카드 내부, 패딩 포함)
+      const qrPad = 16;
+      const qrSize = Math.min(cardW, cardH) - qrPad * 2;
+      const qrX = cardCX - qrSize / 2;
+      const qrY = cardCY - qrSize / 2;
 
-      // 다운로드
-      const a = document.createElement('a');
-      a.href = c.toDataURL('image/png');
-      a.download = studentName + '_정원QR.png';
-      a.click();
-      closeQRModal();
-      showToast('QR 카드가 저장되었어요! 🌿');
+      const qr = new Image();
+      qr.onload = function() {
+        ctx.drawImage(qr, qrX, qrY, qrSize, qrSize);
+        resolve(c.toDataURL('image/png'));
+      };
+      qr.src = qrSrc;
     };
-    qr.src = qrSrc;
-  };
-  bgImg.src = GARDEN_BG_SRC;
+    bgImg.src = GARDEN_BG_SRC;
+  });
 }
 
 async function saveAllAsPDF() {
-  showToast('QR 카드 생성 중... 잠시만 기다려 주세요 🌿');
+  showToast('PDF 생성 중... 잠시만 기다려 주세요 📄');
   closeQRModal();
+  await new Promise(r => setTimeout(r, 100));
 
-  const BG_SRC = GARDEN_BG_SRC;
-  const W = 800, H = 1100;
+  const { jsPDF } = window.jspdf;
+  const pageW = 210, pageH = 297;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  function makeQRCard(work) {
-    return new Promise(resolve => {
-      // 임시 QR 생성
-      const tmpDiv = document.createElement('div');
-      tmpDiv.style.cssText = 'position:fixed;left:-9999px;top:0';
-      document.body.appendChild(tmpDiv);
-      new QRCode(tmpDiv, {
-        text: work.url || getGardenURL(), width: 400, height: 400,
-        colorDark: '#2D3748', colorLight: '#FFFFFF',
-        correctLevel: QRCode.CorrectLevel.H
-      });
-      setTimeout(() => {
-        const qrCanvas = tmpDiv.querySelector('canvas');
-        const qrImg = tmpDiv.querySelector('img');
-        let qrSrc = '';
-        if (qrCanvas) qrSrc = qrCanvas.toDataURL('image/png');
-        else if (qrImg) qrSrc = qrImg.src;
-        document.body.removeChild(tmpDiv);
-
-        const c = document.createElement('canvas');
-        c.width = W; c.height = H;
-        const ctx = c.getContext('2d');
-
-        const bgImg = new Image();
-        bgImg.onload = () => {
-          const scale = Math.max(W / bgImg.width, H / bgImg.height);
-          const bw = bgImg.width * scale, bh = bgImg.height * scale;
-          ctx.drawImage(bgImg, (W - bw) / 2, (H - bh) / 2, bw, bh);
-
-          ctx.fillStyle = 'rgba(255,255,255,0.15)';
-          ctx.fillRect(0, 0, W, H);
-
-          // 귤색 이름 뱃지
-          const bW = 440, bH = 90, bX = (W - bW) / 2, bY = 200, r = 45;
-          ctx.beginPath();
-          ctx.moveTo(bX + r, bY); ctx.lineTo(bX + bW - r, bY);
-          ctx.arcTo(bX + bW, bY, bX + bW, bY + r, r);
-          ctx.lineTo(bX + bW, bY + bH - r);
-          ctx.arcTo(bX + bW, bY + bH, bX + bW - r, bY + bH, r);
-          ctx.lineTo(bX + r, bY + bH);
-          ctx.arcTo(bX, bY + bH, bX, bY + bH - r, r);
-          ctx.lineTo(bX, bY + r); ctx.arcTo(bX, bY, bX + r, bY, r);
-          ctx.closePath();
-          ctx.fillStyle = '#F5A623';
-          ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4;
-          ctx.fill();
-
-          ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = 'bold 44px "Apple SD Gothic Neo","Noto Sans KR",sans-serif';
-          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText(work.student, W / 2, bY + bH / 2);
-
-          // 흰색 반투명 QR 카드
-          const cardW = 420, cardH = 420, cardX = (W - cardW) / 2, cardY = 350, cr = 30;
-          ctx.beginPath();
-          ctx.moveTo(cardX + cr, cardY); ctx.lineTo(cardX + cardW - cr, cardY);
-          ctx.arcTo(cardX + cardW, cardY, cardX + cardW, cardY + cr, cr);
-          ctx.lineTo(cardX + cardW, cardY + cardH - cr);
-          ctx.arcTo(cardX + cardW, cardY + cardH, cardX + cardW - cr, cardY + cardH, cr);
-          ctx.lineTo(cardX + cr, cardY + cardH);
-          ctx.arcTo(cardX, cardY + cardH, cardX, cardY + cardH - cr, cr);
-          ctx.lineTo(cardX, cardY + cr); ctx.arcTo(cardX, cardY, cardX + cr, cardY, cr);
-          ctx.closePath();
-          ctx.fillStyle = 'rgba(255,255,255,0.82)';
-          ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 36; ctx.shadowOffsetY = 8;
-          ctx.fill();
-          ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-
-          if (qrSrc) {
-            const qr = new Image();
-            qr.onload = () => {
-              const pad = 30;
-              ctx.drawImage(qr, cardX + pad, cardY + pad, cardW - pad*2, cardH - pad*2);
-              ctx.fillStyle = 'rgba(255,255,255,0.92)';
-              ctx.font = '28px "Apple SD Gothic Neo","Noto Sans KR",sans-serif';
-              ctx.fillText('QR코드로 나의 작은 정원에 입장해요!', W / 2, cardY + cardH + 70);
-              resolve(c.toDataURL('image/png'));
-            };
-            qr.src = qrSrc;
-          } else {
-            resolve(c.toDataURL('image/png'));
-          }
-        };
-        bgImg.src = BG_SRC;
-      }, 100);
-    });
-  }
-
-  // ZIP으로 개별 PNG 저장 (jsPDF 대신 개별 다운로드)
   for (let i = 0; i < works.length; i++) {
     const w = works[i];
-    const dataUrl = await makeQRCard(w);
-    await new Promise(r => setTimeout(r, 200));
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = w.student + '_정원QR.png';
-    a.click();
+    if (i > 0) doc.addPage();
+
+    // 임시 QR 생성
+    const tmpDiv = document.createElement('div');
+    tmpDiv.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(tmpDiv);
+    new QRCode(tmpDiv, {
+      text: w.url || getGardenURL(), width: 400, height: 400,
+      colorDark: '#2D3748', colorLight: '#FFFFFF',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+    await new Promise(r => setTimeout(r, 80));
+
+    const qrCanvas = tmpDiv.querySelector('canvas');
+    const qrImg = tmpDiv.querySelector('img');
+    let qrSrc = '';
+    if (qrCanvas) qrSrc = qrCanvas.toDataURL('image/png');
+    else if (qrImg) qrSrc = qrImg.src;
+    document.body.removeChild(tmpDiv);
+
+    // drawQRCard로 합성
+    const cardDataUrl = await drawQRCard(qrSrc, w.student);
+
+    // A4 페이지에 꽉 채우기
+    doc.addImage(cardDataUrl, 'PNG', 0, 0, pageW, pageH);
   }
-  showToast('전체 QR 카드가 저장되었어요! 🌿');
+
+  doc.save('나의작은정원_전체QR.pdf');
+  showToast('PDF가 저장되었어요! 🎉');
 }
 
 // ===== 휴지통 =====
