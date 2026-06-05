@@ -750,6 +750,14 @@ function getGalleryURL() {
   var classCode = currentTeacher.classCode || '';
   return base + '?teacher=' + currentTeacher.id + '&class=' + classCode + '&mode=gallery';
 }
+function getWorkURL(work) {
+  var base = 'https://my-little-garden-orpin.vercel.app/';
+  // docId가 있으면 단일 작품 뷰어, 없으면 갤러리
+  if (work && work.docId) {
+    return base + '?doc=' + work.docId;
+  }
+  return base + '?teacher=' + currentTeacher.id + '&class=' + (currentTeacher.classCode || '') + '&mode=gallery';
+}
 
 // ===== 로그인 =====
 function getDB() {
@@ -1164,7 +1172,7 @@ function openQRSelectedModal() {
   // QR 생성 (첫 번째 작품 URL)
   document.getElementById('qr-modal-canvas').innerHTML = '';
   qrModalInstance = new QRCode(document.getElementById('qr-modal-canvas'), {
-    text: selected[0].url || getGalleryURL(),
+    text: selected[0].url || getWorkURL(selected[0]),
     width: 260, height: 260,
     colorDark: '#2D3748', colorLight: '#FFFFFF',
     correctLevel: QRCode.CorrectLevel.H
@@ -1290,7 +1298,7 @@ async function saveAllAsPDF() {
     tmpDiv.style.cssText = 'position:fixed;left:-9999px;top:0';
     document.body.appendChild(tmpDiv);
     new QRCode(tmpDiv, {
-      text: w.url || getGalleryURL(), width: 400, height: 400,
+      text: w.url || getWorkURL(w), width: 400, height: 400,
       colorDark: '#2D3748', colorLight: '#FFFFFF',
       correctLevel: QRCode.CorrectLevel.H
     });
